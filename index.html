@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SRBC Training V18</title>
+    <style>
+        /* --- STYLE V18 --- */
+        :root { --bg: #121212; --panel: #1e1e1e; --primary: #27ae60; --ffb: #3498db; --text: #e0e0e0; --danger: #c0392b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 100px; overscroll-behavior-y: none; }
+        * { box-sizing: border-box; }
+
+        .admin-only { display: none !important; }
+        body.is-admin .admin-only { display: block !important; }
+        body.is-admin .fab.admin-only { display: flex !important; }
+
+        header { background: #000; padding: 12px 15px; border-bottom: 3px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 1.1rem; color: var(--primary); letter-spacing: 1px; }
+        
+        .status-badge { display: flex; align-items: center; gap: 8px; background: #333; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; border: 1px solid #444; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot.local { background: #7f8c8d; }
+        .dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+        .dot.sync { background: #f1c40f; animation: pulse 0.8s infinite; }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        #configBox { display: none; background: #222; padding: 20px; border-bottom: 1px solid #444; }
+        .admin-login-area { border-top: 1px solid #444; margin-top: 15px; padding-top: 15px; }
+
+        .filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: #1a1a1a; position: sticky; top: 0; z-index: 40; border-bottom: 1px solid #333; }
+        select { background: #2c2c2c; color: white; border: 1px solid #444; padding: 10px; border-radius: 5px; flex: 1; font-size: 1rem; min-width: 100px; }
+        #filterSource { border-color: var(--ffb); color: var(--ffb); font-weight: bold; }
+
+        .container { padding: 15px; max-width: 1200px; margin: 0 auto; }
+        .exercise-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        
+        .card { background: var(--panel); width: 100%; max-width: 350px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.4); cursor: pointer; border: 1px solid #333; position: relative; display: flex; flex-direction: column; }
+        .card-img-placeholder { height: 140px; background: radial-gradient(circle, #2c3e50, #000); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #555; }
+        .card-img-real { width: 100%; height: 140px; object-fit: cover; }
+        .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+        .card-title { margin: 0 0 5px 0; color: var(--text); font-size: 1.1rem; font-weight: bold; }
+        
+        .badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
+        .badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #444; background: #222; color: #aaa; }
+        .source-tag { position: absolute; top: 10px; right: 10px; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; color: white; box-shadow: 0 2px 5px black; }
+        .source-tag.SRBC { background: var(--primary); }
+        .source-tag.FFB { background: var(--ffb); }
+        .badge.cat { background: #444; color: #fff; border: 1px solid #666; font-style: italic; }
+
+        .fab { position: fixed; bottom: 25px; right: 25px; width: 65px; height: 65px; background: var(--primary); border-radius: 50%; color: white; font-size: 35px; align-items: center; justify-content: center; z-index: 50; box-shadow: 0 6px 12px rgba(0,0,0,0.6); cursor: pointer; border:none; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 100; overflow-y: auto; }
+        .modal.active { display: flex; flex-direction: column; }
+        .modal-content { background: var(--panel); width: 100%; min-height: 100%; padding: 20px; position: relative; }
+        @media (min-width: 768px) { .modal-content { max-width: 1000px; margin: 30px auto; min-height: auto; border-radius: 8px; border: 1px solid #444; } .play-layout { display: flex; gap: 20px; } .play-left, .play-right { flex: 1; } }
+
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 2.5rem; color: #888; cursor: pointer; z-index: 10; line-height:0.8; }
+        
+        input, textarea, select, button { width: 100%; padding: 15px; border-radius: 8px; border: 1px solid #444; background: #2c2c2c; color: white; margin-bottom: 10px; font-size: 1rem; }
+        .btn-primary { background: var(--primary); border: none; font-weight: bold; cursor: pointer; color: white; }
+        .btn-danger { background: var(--danger); border: none; cursor: pointer; color: white; }
+        .btn-sec { background: #444; border: none; cursor: pointer; color: #ccc; }
+
+        .cue-box { background: #111; padding: 10px; border-radius: 8px; display: flex; gap: 15px; align-items: center; margin-bottom: 15px; border: 1px solid #333; }
+        .cue-ball { width: 70px; height: 70px; background: radial-gradient(circle at 30% 30%, #fff, #999); border-radius: 50%; position: relative; flex-shrink: 0; cursor: crosshair; }
+        .cue-ball-lg { width: 120px; height: 120px; margin: 0 auto; }
+        .dot-impact { width: 14px; height: 14px; background: #e74c3c; position: absolute; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; box-shadow: 0 0 5px black; }
+        .timer-display { font-family: monospace; font-size: 2.5rem; text-align: center; background: black; padding: 10px; border-radius: 8px; color: var(--primary); border: 1px solid #333; margin-bottom: 10px; }
+        .history-item { background: #2a2a2a; padding: 10px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--primary); }
+        .btn-trash { background: var(--danger); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SRBC Pro</h1>
+        <div class="status-badge" onclick="toggleConfig()">
+            <div id="statusDot" class="dot local"></div>
+            <span id="statusText">Réglages</span>
+        </div>
+    </header>
+
+    <div id="configBox">
+        <h3 style="margin-top:0; color:var(--primary)">☁️ Connexion Cloud</h3>
+        <label style="font-size:0.8rem; color:#aaa;">URL du Script Google</label>
+        <input type="text" id="apiUrlInput" placeholder="https://script.google.com/..." style="font-size:0.8rem;">
+        
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <button class="btn-primary" onclick="saveConfig()">Connecter</button>
+            <button class="btn-sec" onclick="syncDown()">⬇️ Recevoir</button>
+        </div>
+
+        <div class="admin-only" style="border:1px solid #555; padding:10px; border-radius:8px; margin-bottom:10px;">
+            <label style="color:var(--danger)">⚠️ Zone Admin</label>
+            <button class="btn-primary" style="background:#2980b9;" onclick="forcePushMaster()">⬆️ Forcer l'envoi (Maj Cloud)</button>
+            <button class="btn-danger" onclick="hardReset()">⚠️ Reset Local Total</button>
+        </div>
+        
+        <button class="btn-sec" onclick="showQRCode()">📱 QR Code</button>
+
+        <div id="adminLoginArea" class="admin-login-area">
+            <label style="color:#aaa;">Déverrouiller Admin</label>
+            <div style="display:flex; gap:10px;">
+                <input type="password" id="adminPass" placeholder="Mot de passe">
+                <button class="btn-sec" onclick="unlockAdmin()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="filters">
+        <select id="filterSource" onchange="updateTypeFilter(); renderList();" style="font-weight:bold; color:var(--primary);">
+            <option value="all">📚 Collection (Tout)</option>
+            <option value="SRBC">🟢 SRBC</option>
+            <option value="FFB">🔵 FFB</option>
+        </select>
+
+        <select id="filterDiff" onchange="renderList()">
+            <option value="all">Niveau</option>
+            <option value="Facile">Facile</option>
+            <option value="Moyen">Moyen</option>
+            <option value="Difficile">Difficile</option>
+        </select>
+
+        <select id="filterType" onchange="renderList()">
+            <option value="all">Type / Catégorie</option>
+        </select>
+    </div>
+
+    <div class="container">
+        <div id="exerciseList" class="exercise-list"></div>
+        <div id="emptyMsg" style="text-align:center; color:#666; margin-top:50px; display:none;">Aucun exercice trouvé. <br>Admin > Reset Local Total.</div>
+    </div>
+
+    <button class="fab admin-only" onclick="openEditor()">+</button>
+
+    <div id="modalEditor" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('modalEditor')">&times;</span>
+            <h2 style="color:var(--primary); margin-top:0;">Éditeur</h2>
+            <input type="hidden" id="editId">
+            <div style="display:flex; gap:10px;">
+                <select id="editSource"><option value="SRBC">SRBC</option><option value="FFB">FFB</option></select>
+                <input type="text" id="editCat" placeholder="Catégorie (Ex: Puissance...)">
+            </div>
+            <input type="text" id="editTitle" placeholder="Titre">
+            <div style="display:flex; gap:10px;">
+                <select id="editDiff"><option>Facile</option><option>Moyen</option><option>Difficile</option></select>
+                <select id="editType"><option>Statique</option><option>Dynamique</option></select>
+            </div>
+            <input type="text" id="editImg" placeholder="URL Image">
+            <div class="cue-ball cue-ball-lg" onclick="setImpact(event, 'editImpact', 'editX', 'editY')">
+                <div id="editImpact" class="dot-impact" style="top:50%; left:50%;"></div>
+            </div>
+            <input type="hidden" id="editX" value="50"><input type="hidden" id="editY" value="50">
+            <textarea id="editDesc" rows="3" placeholder="Description"></textarea>
+            <textarea id="editScale" rows="2" placeholder="Barème"></textarea>
+            
+            <button id="btnSave" class="btn-primary" onclick="saveData()">Enregistrer</button>
+            <button class="btn-danger" onclick="deleteData()">Supprimer</button>
+        </div>
+    </div>
+
+    <div id="modalPlay" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('modalPlay')">&times;</span>
+            <h2 id="viewTitle" style="color:var(--primary); margin:0; margin-bottom:10px; padding-right:40px;"></h2>
+            <div class="badges" style="margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
+                <span id="viewSourceTag" class="badge"></span>
+                <span id="viewCatTag" class="badge cat"></span>
+                <span id="viewDiff" class="badge"></span>
+            </div>
+            <div class="play-layout">
+                <div class="play-left">
+                    <div id="viewImgContainer" style="background:#000; height:220px; display:flex; justify-content:center; align-items:center; border-radius:8px; overflow:hidden; margin-bottom:15px;"></div>
+                    <div class="cue-box">
+                        <div class="cue-ball"><div id="viewImpact" class="dot-impact"></div></div>
+                        <div style="flex:1; max-height:150px; overflow-y:auto; color:#ccc; font-size:0.9rem;">
+                            <div id="viewDesc" style="white-space:pre-wrap;"></div>
+                            <div id="viewScale" style="color:var(--primary); margin-top:8px; font-weight:bold;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="play-right">
+                    <div class="timer-display" id="timerDisplay">00:00</div>
+                    <div style="display:flex; gap:10px; margin-bottom:20px;">
+                        <input type="number" id="timerInput" value="10" style="text-align:center; margin:0; flex:1;">
+                        <button class="btn-primary" id="btnTimer" onclick="toggleTimer()" style="margin:0; flex:1;">START</button>
+                        <button class="btn-sec" onclick="resetTimer()" style="margin:0; flex:1;">RESET</button>
+                    </div>
+                    <hr style="border-color:#333;">
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="inputName" placeholder="Nom" style="flex:2">
+                        <input type="number" id="inputScore" placeholder="Pts" style="flex:1">
+                    </div>
+                    <button class="btn-primary" onclick="addScore()" style="margin-bottom:20px;">VALIDER</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; padding-top:10px; border-top:1px solid #333;">
+                        <span style="color:#aaa; font-size:1rem; font-weight:bold;">Historique</span>
+                        <select id="filterScorePlayer" style="width:auto; padding:5px; margin:0; background:#333;" onchange="renderHistory()">
+                            <option value="all">Tous</option>
+                        </select>
+                    </div>
+                    <div id="historyList" style="max-height:200px; overflow-y:auto;"></div>
+                    <button class="btn-sec admin-only" onclick="openEditorFromView()" style="width:100%; margin-top:20px; border:1px solid #555;">✏️ Modifier (Admin)</button>
+                    <div style="height:50px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DONNEES BASE
+        const DATA_SRBC = [{t:"Chevalet par dessus",d:"Facile",ty:"Statique",desc:"- Faire un aller retour avec la blanche en restant dans l'axe avec un chevalet par dessus la bille 1, 2 puis 3.\n- La blanche doit toucher la bille objet.",sc:"1 pt/bille - Max 15"},{t:"Echappée 3 Bandes",d:"Facile",ty:"Dynamique",desc:"- Venir au contact de la 8 en faisant 3 bandes puis bande après contact.",sc:"1 pt/bille - Max 10/côté"},{t:"3/4 de billes",d:"Facile",ty:"Statique",desc:"- Empocher le bille dans le coin puis remettre la blanche en position pour la bille suivante.",sc:"1 pt/bille - Max 20"},{t:"Bande Position 1",d:"Facile",ty:"Statique",desc:"- Empocher la bille objet en bande pour chaque position de blanche",sc:"1 pt/bille - Max 5/côté"},{t:"Stop Shot Entre Billes",d:"Facile",ty:"Statique",desc:"- Empocher la 1 en faisant un carreau sans toucher les 2 autres.",sc:"1 pt/bille - Max 6"},{t:"Effet 1",d:"Facile",ty:"Statique",desc:"- Venir toucher les billes dans l'ordre avec effet latéral.",sc:"1 pt/bille - Max 6"},{t:"Tir Droit",d:"Facile",ty:"Statique",desc:"- Série de 10,20,30,40,50 tirs droits. Alterner côté.",sc:"1 pt/bille"},{t:"Quantite de bille 1",d:"Facile",ty:"Statique",desc:"- Empocher la 1 puis la 2 pour chaque position.",sc:"1 pt/bille - Max 10"},{t:"Le Rectangle",d:"Moyen",ty:"Dynamique",desc:"- Départ bille en main. Empocher dans l'ordre. Pas de replace.",sc:"1 pt/bille - Max 6"},{t:"Le Rectangle 2",d:"Moyen",ty:"Dynamique",desc:"- Idem Rectangle 1.",sc:"1 pt/bille - Max 6"},{t:"Le 5-2",d:"Moyen",ty:"Statique",desc:"- Ligne départ 5-2, 6-2.5... Tir constant.",sc:"1 pt/bille - Max 4"},{t:"Le L 5 Billes",d:"Moyen",ty:"Dynamique",desc:"- Bille en main. Empocher dans l'ordre dans le coin. Sans contact.",sc:"1 pt/bille - Max 5"},{t:"Le L 9 Billes",d:"Moyen",ty:"Dynamique",desc:"- Idem L 5 billes.",sc:"1 pt/bille - Max 9"},{t:"Stop Shot Puissance",d:"Moyen",ty:"Statique",desc:"- Empocher 5 fois chaque bille en stop shot.",sc:"1 pt/bille - Max 15"},{t:"Trajectoire Blanche 1",d:"Moyen",ty:"Dynamique",desc:"- Empocher la 1 et choquer les suivantes. Remplacement.",sc:"1 pt/bille - Max 9"},{t:"Trajectoire Blanche 2",d:"Moyen",ty:"Dynamique",desc:"- Idem, longé de bande.",sc:"1 pt/bille - Max 7"},{t:"Trajectoire Blanche 3",d:"Moyen",ty:"Dynamique",desc:"- Idem Traj 1.",sc:"1 pt/bille - Max 9"},{t:"Trajectoire Blanche 4",d:"Moyen",ty:"Dynamique",desc:"- Idem Traj 1.",sc:"1 pt/bille - Max 9"},{t:"Retour Au Centre",d:"Moyen",ty:"Dynamique",desc:"- Empocher et revenir zone centrale. Sans contact.",sc:"1 pt/bille - Max 4"},{t:"Quantite de bille 2",d:"Moyen",ty:"Statique",desc:"- Empocher la 9, changer de côté.",sc:"1 pt/bille - Max 7/côté"},{t:"Quantite de bille 3",d:"Moyen",ty:"Statique",desc:"- Empocher bille sur spot. 5 tentatives.",sc:"1 pt/bille - Max 5"},{t:"Line Up Central",d:"Moyen",ty:"Dynamique",desc:"- Empocher tout dans poche centrale.",sc:"1 pt/bille - Max 7"},{t:"Retour Petite Bande",d:"Moyen",ty:"Dynamique",desc:"- Longé de bande avec replace.",sc:"1 pt/tour - Max 10"},{t:"Mighty X",d:"Moyen",ty:"Statique",desc:"- Diagonales en carreau. Alterner.",sc:"1 pt/bille"},{t:"Le Carré",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre. Pas de bandes.",sc:"1 pt/bille - Max 9"},{t:"Le Cercle",d:"Moyen",ty:"Dynamique",desc:"- Ne pas sortir la blanche du cercle.",sc:"1 pt/bille - Max 8"},{t:"Longé Bande Même Côté",d:"Moyen",ty:"Statique",desc:"- Longé de bande.",sc:"1 pt/bille - Max 6"},{t:"Longé Bande Opposé",d:"Moyen",ty:"Statique",desc:"- Longé de bande.",sc:"1 pt/bille - Max 6"},{t:"Line Up Inversé",d:"Moyen",ty:"Dynamique",desc:"- Protection derrière billes milieu.",sc:"1 pt/bille - Max 8"},{t:"Line Up Court",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre, poche libre.",sc:"1 pt/bille - Max 8"},{t:"3 billes Continu",d:"Moyen",ty:"Dynamique",desc:"- 3 billes tout ordre, replacer.",sc:"1 pt/tour - Max 10"},{t:"Gamme 1",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre, poche libre.",sc:"1 pt/bille - Max 4"},{t:"Fermeture Stop Shot",d:"Moyen",ty:"Statique",desc:"- Empocher tout en stop shot.",sc:"1 pt/bille - Max 9"},{t:"Fermeture Progressive",d:"Moyen",ty:"Dynamique",desc:"- 3 billes, puis 4, puis 5...",sc:"1 pt/bille"},{t:"Break 6 Billes",d:"Moyen",ty:"Dynamique",desc:"- Casse 6 billes, vider la table.",sc:"1 pt/bille - Max 6"},{t:"Les 2 Dernieres",d:"Moyen",ty:"Dynamique",desc:"- Empocher coin et replace.",sc:"1 pt/tour - Max 10"},{t:"4 billes Bande",d:"Moyen",ty:"Statique",desc:"- Longé bande.",sc:"1 pt/bille - Max 6"},{t:"Double Line Up",d:"Difficile",ty:"Dynamique",desc:"- Empocher tout dans l'ordre.",sc:"1 pt/bille - Max 15"},{t:"Gamme 2",d:"Difficile",ty:"Dynamique",desc:"- Intérieur vers extérieur alterné.",sc:"1 pt/bille - Max 8"},{t:"Le Tour Infernal",d:"Difficile",ty:"Dynamique",desc:"- Ordre et poches définies.",sc:"1 pt/bille - Max 12"},{t:"Fermeture 9ball",d:"Difficile",ty:"Dynamique",desc:"- Jeu de la 9.",sc:"1 pt/bille - Max 9"},{t:"Le Tour du Monde",d:"Difficile",ty:"Dynamique",desc:"- Empocher la 9 collé bande.",sc:"1 pt/bille - Max 24"}];
+
+        // DONNEES FFB
+        const DATA_FFB = [{c:"Puissance",t:"Exo 1",d:"Facile",desc:"Empocher 3 fois 3 billes avec chevalet sur cadre.\nLa blanche ne doit pas sortir de la zone grise.",sc:"Obj: 7/9"},{c:"Puissance",t:"Exo 2",d:"Moyen",desc:"Empocher 2 fois 5 billes avec chevalet sur cadre.\nLa blanche ne doit pas sortir de la zone grise.",sc:"Obj: 5/10"},{c:"Puissance",t:"Exo 3",d:"Moyen",desc:"Empocher 2 fois 5 billes, chevalet sur surface.\nLa blanche ne doit pas sortir de la zone grise.",sc:"Obj: 5/10"},{c:"Puissance",t:"Exo 4",d:"Difficile",desc:"Empocher 4 fois 2 billes, chevalet surface.\nLa blanche ne doit pas sortir de la zone grise.",sc:"Obj: 5/8"},{c:"Pleine Bille",t:"Exo 1",d:"Facile",desc:"Empocher 8 billes pleine, chevalet sur cadre.",sc:"Obj: 6/8"},{c:"Pleine Bille",t:"Exo 2",d:"Moyen",desc:"Empocher 6 billes pleine, chevalet surface, distances différentes.",sc:"Obj: 4/6"},{c:"Pleine Bille",t:"Exo 3",d:"Moyen",desc:"Empocher 8 billes pleine, chevalet surface.",sc:"Obj: 4/8"},{c:"Pleine Bille",t:"Exo 4",d:"Moyen",desc:"Empocher 8 billes pleine, poches milieu, chevalet cadre.",sc:"Obj: 6/8"},{c:"Pleine Bille",t:"Exo 5",d:"Difficile",desc:"Empocher 8 billes pleine, longé bande, chevalet cadre.",sc:"Obj: 6/8"},{c:"Pleine Bille",t:"Exo 6",d:"Difficile",desc:"Empocher 8 billes pleine, longé bande, chevalet surface.",sc:"Obj: 6/8"},{c:"1/2 Bille",t:"Exo 1",d:"Moyen",desc:"Empocher 6 billes demi-bille, poches milieu, distances différentes.",sc:"Obj: 4/6"},{c:"1/2 Bille",t:"Exo 2",d:"Moyen",desc:"Empocher 8 billes demi-bille, chevalet surface.",sc:"Obj: 4/8"},{c:"1/2 Bille",t:"Exo 3",d:"Facile",desc:"Empocher 8 billes demi-bille, chevalet cadre.",sc:"Obj: 5/8"},{c:"1/2 Bille",t:"Exo 4",d:"Moyen",desc:"Empocher 8 billes demi-bille, chevalet surface.",sc:"Obj: 4/8"},{c:"Finesse",t:"Exo 1 (1/4)",d:"Difficile",desc:"Empocher 8 billes quart de bille, chevalet surface.",sc:"Obj: 6/8"},{c:"Finesse",t:"Exo 2 (1/4)",d:"Moyen",desc:"Empocher 8 billes quart de bille, chevalet cadre.",sc:"Obj: 8/12"},{c:"Finesse",t:"Exo 3",d:"Difficile",desc:"Empocher 8 billes en finesse, chevalet cadre.",sc:"Obj: 4/8"},{c:"Finesse",t:"Exo 4",d:"Difficile",desc:"Empocher 8 billes en finesse, poches milieu, chevalet surface.",sc:"Obj: 4/8"},{c:"Quantité",t:"Exo 1",d:"Moyen",desc:"Empocher 7 fois une bille selon différentes quantités.",sc:"Obj: 5/7"},{c:"Quantité",t:"Exo 2",d:"Moyen",desc:"Empocher 8 fois une bille selon différentes quantités.",sc:"Obj: 5/8"},{c:"Quantité",t:"Exo 3",d:"Difficile",desc:"Empocher 9 fois une bille, poches milieu, différentes quantités.",sc:"Obj: 5/9"},{c:"Quantité",t:"Exo 4",d:"Moyen",desc:"Empocher 4 fois 2 billes selon différentes quantités.",sc:"Obj: 5/8"},{c:"Rejet",t:"Exo 1",d:"Facile",desc:"Rejet naturel, replacer 5 fois la blanche pour jouer la noire.",sc:"Obj: 3/5"},{c:"Rejet",t:"Exo 2",d:"Moyen",desc:"Rejet naturel, replacer 5 fois la blanche pour jouer la noire.",sc:"Obj: 3/5"},{c:"Rejet",t:"Exo 3",d:"Moyen",desc:"Rejet naturel, replacer 5 fois la blanche pour jouer la noire.",sc:"Obj: 3/5"},{c:"Rejet",t:"Exo 4",d:"Moyen",desc:"Rejet naturel, replacer 5 fois la blanche pour jouer la noire.",sc:"Obj: 3/5"},{c:"Bandes",t:"Exo 1",d:"Facile",desc:"Jouer une bande avant.",sc:"Obj: 3/5"},{c:"Bandes",t:"Exo 2",d:"Moyen",desc:"Jouer une bande avant.",sc:"Obj: 3/5"},{c:"Bandes",t:"Exo 3",d:"Difficile",desc:"Jouer 2 bandes avant de toucher la bille.",sc:"Obj: 2/3"},{c:"Bandes",t:"Exo 4",d:"Difficile",desc:"Jouer 2 bandes avant de toucher la bille.",sc:"Obj: 2/3"},{c:"Coulé",t:"Exo 1",d:"Facile",desc:"Avancer blanche au-delà du trait pour jouer la noire.",sc:"Obj: 3/5"},{c:"Coulé",t:"Exo 2",d:"Moyen",desc:"Replacer 5 fois blanche pour jouer la noire.",sc:"Obj: 3/5"},{c:"Coulé",t:"Exo 3",d:"Moyen",desc:"4 séries de 3 billes, replacer pour jouer la noire.",sc:"Obj: 8/12"},{c:"Coulé",t:"Exo 4",d:"Difficile",desc:"2 séries de 5 billes, replacer pour jouer la noire.",sc:"Obj: 6/10"},{c:"Coulé",t:"Exo 5",d:"Moyen",desc:"Avancer blanche au-delà trait pour jouer noire.",sc:"Obj: 3/5"},{c:"Coulé",t:"Exo 6",d:"Moyen",desc:"Replacer 5 fois blanche pour jouer noire.",sc:"Obj: 3/5"},{c:"Coulé",t:"Exo 7",d:"Difficile",desc:"Empocher 6 billes, coulé pour replacer 3 fois chaque zone.",sc:"Obj: 4/6"},{c:"Coulé",t:"Exo 8",d:"Moyen",desc:"Avancer blanche au-delà trait pour jouer noire.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 1",d:"Facile",desc:"Rétro pour replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 2",d:"Moyen",desc:"Rétro, chevalet cadre, replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 3",d:"Moyen",desc:"Empocher 6 billes, rétro 3 fois chaque zone.",sc:"Obj: 4/6"},{c:"Rétro",t:"Exo 4",d:"Difficile",desc:"Empocher 6 billes, rétro 3 fois chaque zone.",sc:"Obj: 4/6"},{c:"Rétro",t:"Exo 5",d:"Moyen",desc:"Rétro pour replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 6",d:"Moyen",desc:"Rétro, chevalet cadre, replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 7",d:"Difficile",desc:"Empocher 6 billes, rétro 3 fois chaque zone.",sc:"Obj: 4/6"},{c:"Rétro",t:"Exo 8",d:"Moyen",desc:"Rétro pour replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 9",d:"Moyen",desc:"Rétro pour replacer au-delà du trait.",sc:"Obj: 3/5"},{c:"Rétro",t:"Exo 10",d:"Difficile",desc:"Empocher 6 billes, rétro 3 fois chaque zone.",sc:"Obj: 4/6"},{c:"Carreau",t:"Exo 1",d:"Facile",desc:"Carreau pour replacer sur la noire.",sc:"Obj: 3/5"},{c:"Carreau",t:"Exo 2",d:"Moyen",desc:"Carreau pour replacer sur la noire.",sc:"Obj: 3/5"},{c:"Carreau",t:"Exo 3",d:"Moyen",desc:"Carreau pour replacer sur la noire.",sc:"Obj: 3/5"},{c:"Carreau",t:"Exo 4",d:"Moyen",desc:"Carreau pour replacer sur la noire.",sc:"Obj: 3/5"},{c:"Trajectoire",t:"Exo 1",d:"Moyen",desc:"Empocher 9 billes, varier hauteur, toucher 3 fois chaque jaune.",sc:"Obj: 6/9"},{c:"Trajectoire",t:"Exo 2",d:"Difficile",desc:"Empocher 10 billes, alterner haut/centre, replacer sur noire.",sc:"Obj: 6/10"},{c:"Trajectoire",t:"Exo 3",d:"Moyen",desc:"Empocher 9 billes, varier hauteur, toucher 3 fois chaque jaune.",sc:"Obj: 6/9"},{c:"Trajectoire",t:"Exo 4",d:"Difficile",desc:"Empocher 10 billes, alterner haut/bas, replacer sur noire.",sc:"Obj: 6/10"},{c:"Trajectoire",t:"Exo 5",d:"Difficile",desc:"Enchaîner 3 replacements différents ordre croissant.",sc:"Obj: 6/9"},{c:"Trajectoire",t:"Exo 6",d:"Difficile",desc:"Enchaîner 5 replacements différents ordre croissant.",sc:"Obj: 10/15"},{c:"Angle Droit",t:"Exo 1",d:"Moyen",desc:"Angle droit, replacer sur la noire.",sc:"Obj: 3/5"},{c:"Angle Droit",t:"Exo 2",d:"Moyen",desc:"Angle droit, replacer par bande sur la noire.",sc:"Obj: 3/5"},{c:"Angle Droit",t:"Exo 3",d:"Difficile",desc:"Angle droit, replacer par bande sur la noire.",sc:"Obj: 3/5"},{c:"Angle Droit",t:"Exo 4",d:"Difficile",desc:"Angle droit, replacer par bandes sur la noire.",sc:"Obj: 3/5"},{c:"Défense",t:"Exo 1",d:"Moyen",desc:"Cacher blanche derrière 9 (Carreau, Rétro, Coulé).",sc:"Obj: 4/5"},{c:"Défense",t:"Exo 2",d:"Moyen",desc:"Cacher blanche derrière 9 (Carreau).",sc:"Obj: 7/10"},{c:"Défense",t:"Exo 3",d:"Moyen",desc:"Cacher blanche derrière 9 (Coulé).",sc:"Obj: 8/10"},{c:"Défense",t:"Exo 4",d:"Moyen",desc:"Cacher blanche derrière billes rayées (1/2 bille).",sc:"Obj: 7/10"},{c:"Défense",t:"Exo 5",d:"Moyen",desc:"Coller blanche et noire grande bande, 9 au milieu.",sc:"Obj: 7/10"},{c:"Défense",t:"Exo 6",d:"Difficile",desc:"Cacher derrière 9 (1/2 bille + coulé + rappel).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 7",d:"Difficile",desc:"Cacher derrière objet (1/2 bille + coulé + rappel).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 8",d:"Moyen",desc:"Cacher derrière objet (coulé + appel).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 9",d:"Moyen",desc:"Cacher derrière objet (coulé + bande).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 10",d:"Moyen",desc:"Cacher derrière objet (coulé + bande).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 11",d:"Difficile",desc:"Cacher 7 derrière 8/9, ramener blanche en 3 bandes.",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 12",d:"Difficile",desc:"Cacher derrière objet (coulé effet gauche + 3 bandes).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 13",d:"Moyen",desc:"Cacher derrière rayées (coulé + finesse).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 14",d:"Moyen",desc:"Cacher derrière 8/9, 7 collée petite bande.",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 15",d:"Moyen",desc:"Cacher derrière 8/9, 6 collée petite bande.",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 16",d:"Difficile",desc:"Kick & Stick. Cacher derrière 8/9 (bande + coulé).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 17",d:"Moyen",desc:"Cacher derrière 8 avec rétro.",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 18",d:"Moyen",desc:"Cacher derrière 9.",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 19",d:"Difficile",desc:"Cacher derrière 8/9 (coulé + bande avant).",sc:"Obj: 6/10"},{c:"Défense",t:"Exo 20",d:"Difficile",desc:"Cacher derrière 8 (coulé + bande avant).",sc:"Obj: 6/10"}];
+
+        let exercises = [];
+        let currentId = null;
+        let timerInterval = null; let timeLeft = 0;
+        let API_URL = localStorage.getItem('srbc_api_url') || "";
+
+        init();
+
+        function init() {
+            const local = localStorage.getItem('billiardApp_db');
+            if(local) {
+                exercises = JSON.parse(local);
+                // Migration V17: assure category SRBC = type
+                exercises.forEach(e => {
+                    if(!e.source) e.source = "SRBC";
+                    if(e.source === "SRBC") e.category = e.type; // Fix pour SRBC
+                });
+            } else {
+                generateDefaultDB();
+            }
+            updateTypeFilter();
+            renderList();
+            updateStatus();
+            if(API_URL) syncDown();
+        }
+
+        function generateDefaultDB() {
+            exercises = [];
+            // SRBC (Catégorie = Type)
+            DATA_SRBC.forEach((e,i) => {
+                exercises.push({
+                    id: "srbc_"+i, source:"SRBC", category: e.ty, title:e.t, difficulty:e.d, type:e.ty, 
+                    desc:e.desc, scale:e.sc, img:"", cueX:50, cueY:50, history:[]
+                });
+            });
+            // FFB
+            DATA_FFB.forEach((e,i) => {
+                exercises.push({
+                    id: "ffb_"+i, source:"FFB", category:e.c, title:e.t, difficulty:e.d, type:"Statique", 
+                    desc:e.desc, scale:e.sc, img:"", cueX:50, cueY:50, history:[]
+                });
+            });
+            localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
+        }
+
+        // --- UTILS DYNAMIQUES ---
+        function updateTypeFilter() {
+            const src = document.getElementById('filterSource').value;
+            const typeSelect = document.getElementById('filterType');
+            const currentVal = typeSelect.value;
+            
+            typeSelect.innerHTML = '<option value="all">Type / Catégorie</option>';
+            
+            const available = exercises.filter(e => src === 'all' || e.source === src);
+            const cats = [...new Set(available.map(e => e.category))].sort();
+            
+            cats.forEach(c => {
+                const o = document.createElement('option'); o.value=c; o.innerText=c; typeSelect.appendChild(o);
+            });
+            if(cats.includes(currentVal)) typeSelect.value = currentVal;
+        }
+
+        function unlockAdmin() {
+            if(document.getElementById('adminPass').value === "SRBCAdmin") {
+                document.body.classList.add('is-admin');
+                document.getElementById('adminLoginArea').style.display='none';
+                alert("🔓 Admin OK");
+            } else { alert("❌ Erreur"); }
+        }
+
+        function updateStatus() {
+            const d = document.getElementById('statusDot');
+            const t = document.getElementById('statusText');
+            if(API_URL) { d.className="dot online"; t.innerText="Réglages"; }
+            else { d.className="dot local"; t.innerText="Local"; }
+        }
+
+        function toggleConfig() {
+            const el = document.getElementById('configBox');
+            el.style.display = el.style.display==='block' ? 'none' : 'block';
+            document.getElementById('apiUrlInput').value = API_URL;
+        }
+
+        function saveConfig() {
+            const url = document.getElementById('apiUrlInput').value.trim();
+            if(url) { localStorage.setItem('srbc_api_url', url); API_URL = url; updateStatus(); syncDown(); }
+            toggleConfig();
+        }
+
+        // SYNC DOWN: On ne reçoit que du JSON désormais (le script V5 gère ça)
+        function syncDown() {
+            if(!API_URL) return;
+            document.getElementById('statusDot').className="dot sync";
+            
+            fetch(API_URL)
+            .then(res => res.text())
+            .then(text => {
+                try {
+                    // Si c'est du JSON pur
+                    var data = JSON.parse(text);
+                    // Si c'est la structure de l'appli
+                    if(Array.isArray(data) && data.length > 0) {
+                        exercises = data;
+                        localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
+                        updateTypeFilter();
+                        renderList();
+                        if(currentId) renderHistory();
+                    }
+                    updateStatus();
+                } catch(e) {
+                    // Si le serveur répond du texte bizarre (ex: "Success" d'une vieille version), on ignore
+                    console.log("Received non-JSON data, ignoring update.");
+                    document.getElementById('statusDot').className="dot local";
+                }
+            })
+            .catch(e => {
+                console.error("Sync Down Error", e);
+                document.getElementById('statusDot').className="dot local";
+            });
+        }
+
+        // SYNC UP INTELLIGENT (Text/Plain pour éviter le blocage Google)
+        function syncUp() {
+            if(!API_URL) { localStorage.setItem('billiardApp_db', JSON.stringify(exercises)); renderList(); return Promise.resolve(); }
+            
+            document.getElementById('statusDot').className="dot sync";
+            localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
+
+            return fetch(API_URL, {
+                method: "POST",
+                redirect: "follow",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(exercises)
+            })
+            .then(res => res.text()) // On lit en texte d'abord
+            .then(text => {
+                // Si on reçoit du JSON {status: success} ou juste "Success"
+                updateStatus();
+                return true;
+            })
+            .catch(err => {
+                document.getElementById('statusDot').className="dot local";
+                alert("Echec envoi : Connexion perdue ou fichier trop lourd.");
+                throw err;
+            });
+        }
+
+        function forcePushMaster() {
+            if(!API_URL) return alert("Connectez le Cloud !");
+            if(confirm("Écraser le Cloud par les données d'usine ?")) {
+                generateDefaultDB();
+                syncUp().then(() => alert("Cloud réinitialisé."));
+            }
+        }
+
+        function hardReset() {
+            if(confirm("Effacer tout (Local) ?")) { localStorage.removeItem('billiardApp_db'); location.reload(); }
+        }
+        function showQRCode() {
+            const u="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data="+encodeURIComponent(window.location.href);
+            const w=window.open("","QR","width=300,height=300");
+            w.document.write(`<div style='text-align:center'><img src='${u}'><br>Scannez pour ouvrir</div>`);
+        }
+
+        function renderList() {
+            const list = document.getElementById('exerciseList');
+            const fSrc = document.getElementById('filterSource').value;
+            const fType = document.getElementById('filterType').value;
+            const fDiff = document.getElementById('filterDiff').value;
+            list.innerHTML = '';
+            
+            const order = {"Facile":1, "Moyen":2, "Difficile":3};
+            const filtered = exercises.filter(e => 
+                (fSrc==='all' || e.source===fSrc) &&
+                (fType==='all' || e.category===fType) &&
+                (fDiff==='all' || e.difficulty===fDiff)
+            ).sort((a,b) => {
+                // Tri alphabétique pur comme demandé
+                return a.title.localeCompare(b.title);
+            });
+
+            if(filtered.length === 0) {
+                document.getElementById('emptyMsg').style.display = 'block';
+            } else {
+                document.getElementById('emptyMsg').style.display = 'none';
+                filtered.forEach(ex => {
+                    const c = document.createElement('div'); c.className='card'; c.onclick=()=>openPlay(ex.id);
+                    const img = ex.img ? `<img src="${ex.img}" class="card-img-real">` : `<div class="card-img-placeholder">🎱</div>`;
+                    
+                    const badgeSrc = `<span class="source-tag ${ex.source}">${ex.source}</span>`;
+                    
+                    c.innerHTML = `${badgeSrc}${img}<div class="card-body"><h3 class="card-title">${ex.title}</h3><div class="badges"><span class="badge cat">${ex.category}</span><span class="badge diff-${ex.difficulty}">${ex.difficulty}</span></div></div>`;
+                    list.appendChild(c);
+                });
+            }
+        }
+
+        function openPlay(id) {
+            currentId = id;
+            const ex = exercises.find(e=>e.id===id);
+            document.getElementById('viewTitle').innerText = ex.title;
+            
+            document.getElementById('viewSourceTag').innerText = ex.source;
+            document.getElementById('viewSourceTag').className = `badge src-${ex.source}`;
+            
+            document.getElementById('viewCatTag').innerText = ex.category;
+            document.getElementById('viewDiff').innerText = ex.difficulty;
+            document.getElementById('viewDiff').className = `badge diff-${ex.difficulty}`;
+            
+            document.getElementById('viewDesc').innerText = ex.desc;
+            document.getElementById('viewScale').innerText = ex.scale;
+            document.getElementById('viewImgContainer').innerHTML = ex.img ? `<img src="${ex.img}" style="height:100%; object-fit:contain">` : `<span style="font-size:3rem; color:#444">🎱</span>`;
+            document.getElementById('viewImpact').style.left=ex.cueX+"%"; document.getElementById('viewImpact').style.top=ex.cueY+"%";
+            
+            updatePlayerFilter(ex);
+            renderHistory();
+            document.getElementById('modalPlay').classList.add('active');
+        }
+
+        function addScore() {
+            const n = document.getElementById('inputName').value;
+            const s = document.getElementById('inputScore').value;
+            if(!n || !s) return alert("Infos manquantes");
+            const ex = exercises.find(e=>e.id===currentId);
+            const d = new Date();
+            const dateStr = d.getDate()+"/"+(d.getMonth()+1)+" "+d.getHours()+":"+(d.getMinutes()<10?"0":"")+d.getMinutes();
+            ex.history.push({id:Date.now(), name:n, score:s, date:dateStr});
+            document.getElementById('inputScore').value = "";
+            renderHistory();
+            syncUp();
+        }
+
+        function deleteScore(sid) {
+            if(!confirm("Supprimer score ?")) return;
+            const ex = exercises.find(e=>e.id===currentId);
+            ex.history = ex.history.filter(h => h.id !== sid);
+            renderHistory();
+            syncUp();
+        }
+
+        function renderHistory() {
+            const ex = exercises.find(e=>e.id===currentId);
+            const list = document.getElementById('historyList');
+            const filter = document.getElementById('filterScorePlayer').value;
+            list.innerHTML = "";
+            let h = ex.history.filter(i => filter==='all' || i.name===filter);
+            h.sort((a,b) => parseFloat(b.score) - parseFloat(a.score) || b.id - a.id);
+            h.forEach(item => {
+                const d = document.createElement('div'); d.className='history-item';
+                d.innerHTML = `<div><strong>${item.name}</strong> <small style="color:#888">${item.date}</small></div><div style="display:flex;align-items:center;"><div style="font-weight:bold; color:var(--primary);">${item.score}</div><button class="btn-trash admin-only" onclick="deleteScore(${item.id})">×</button></div>`;
+                list.appendChild(d);
+            });
+        }
+
+        function updatePlayerFilter(ex) {
+            const sel = document.getElementById('filterScorePlayer');
+            sel.innerHTML = '<option value="all">Tous</option>';
+            [...new Set(ex.history.map(i=>i.name))].sort().forEach(n => {
+                let o = document.createElement('option'); o.value=n; o.innerText=n; sel.appendChild(o);
+            });
+        }
+
+        function openEditor() {
+            resetEdit();
+            document.getElementById('editSource').value = "SRBC";
+            document.getElementById('modalEditor').classList.add('active');
+        }
+        function openEditorFromView() {
+            closeModal('modalPlay');
+            const ex = exercises.find(e=>e.id===currentId);
+            document.getElementById('editId').value=ex.id;
+            document.getElementById('editSource').value=ex.source || "SRBC";
+            document.getElementById('editCat').value=ex.category || "";
+            document.getElementById('editTitle').value=ex.title;
+            document.getElementById('editDiff').value=ex.difficulty;
+            document.getElementById('editType').value=ex.type;
+            document.getElementById('editImg').value=ex.img;
+            document.getElementById('editDesc').value=ex.desc;
+            document.getElementById('editScale').value=ex.scale;
+            document.getElementById('editImpact').style.left=ex.cueX+"%"; document.getElementById('editImpact').style.top=ex.cueY+"%";
+            document.getElementById('editX').value=ex.cueX; document.getElementById('editY').value=ex.cueY;
+            document.getElementById('modalEditor').classList.add('active');
+        }
+        function resetEdit() { document.getElementById('editId').value=""; document.getElementById('editCat').value=""; document.getElementById('editTitle').value=""; document.getElementById('editImg').value=""; document.getElementById('editDesc').value=""; document.getElementById('editScale').value=""; }
+        
+        function saveData() {
+            const id = document.getElementById('editId').value || "u_"+Date.now();
+            const t = document.getElementById('editTitle').value; if(!t) return alert("Titre?");
+            
+            // BUTTON FEEDBACK
+            const btn = document.querySelector('#modalEditor .btn-primary');
+            const oldText = btn.innerText;
+            btn.innerText = "⏳ Envoi Cloud...";
+            btn.disabled = true;
+
+            const newItem = {
+                id:id, 
+                source: document.getElementById('editSource').value,
+                category: document.getElementById('editCat').value || "Général",
+                title:t, 
+                difficulty:document.getElementById('editDiff').value, 
+                type:document.getElementById('editType').value,
+                img:document.getElementById('editImg').value, 
+                desc:document.getElementById('editDesc').value, 
+                scale:document.getElementById('editScale').value,
+                cueX:document.getElementById('editX').value, 
+                cueY:document.getElementById('editY').value, 
+                history:[]
+            };
+            
+            const idx = exercises.findIndex(e=>e.id===id);
+            if(idx>-1) { newItem.history=exercises[idx].history; exercises[idx]=newItem; }
+            else exercises.push(newItem);
+            
+            // Reset filtres pour voir le nouvel item
+            document.getElementById('filterSource').value = 'all';
+            document.getElementById('filterType').value = 'all'; 
+            
+            // On attend la fin de la synchro pour fermer
+            syncUp().then(() => {
+                btn.innerText = oldText;
+                btn.disabled = false;
+                closeModal('modalEditor'); 
+                updateTypeFilter(); 
+                renderList(); 
+            });
+        }
+        
+        function deleteData() {
+            if(confirm("Supprimer?")) { exercises = exercises.filter(e=>e.id!==document.getElementById('editId').value); closeModal('modalEditor'); renderList(); syncUp(); }
+        }
+
+        function toggleTimer() {
+            const b = document.getElementById('btnTimer');
+            if(timerInterval) { clearInterval(timerInterval); timerInterval=null; b.innerText="START"; b.classList.remove('btn-danger'); }
+            else {
+                if(timeLeft<=0) timeLeft=(parseInt(document.getElementById('timerInput').value)||10)*60;
+                b.innerText="STOP"; b.classList.add('btn-danger');
+                timerInterval = setInterval(() => {
+                    if(timeLeft<=0) { resetTimer(); alert("Fini!"); return; }
+                    timeLeft--;
+                    const m=Math.floor(timeLeft/60), s=timeLeft%60;
+                    document.getElementById('timerDisplay').innerText = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+                }, 1000);
+            }
+        }
+        function resetTimer() { clearInterval(timerInterval); timerInterval=null; timeLeft=0; document.getElementById('timerDisplay').innerText="00:00"; document.getElementById('btnTimer').innerText="START"; document.getElementById('btnTimer').classList.remove('btn-danger'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); if(id==='modalPlay') resetTimer(); }
+        function setImpact(e,d,x,y) { const r=e.currentTarget.getBoundingClientRect(); const px=((e.clientX-r.left)/r.width)*100; const py=((e.clientY-r.top)/r.height)*100; document.getElementById(d).style.left=px+"%"; document.getElementById(d).style.top=py+"%"; document.getElementById(x).value=px; document.getElementById(y).value=py; }
+    </script>
+</body>
+</html>
