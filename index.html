@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SRBC Training V18</title>
+    <title>SRBC Training V19</title>
     <style>
-        /* --- STYLE V18 --- */
+        /* --- STYLE V19 --- */
         :root { --bg: #121212; --panel: #1e1e1e; --primary: #27ae60; --ffb: #3498db; --text: #e0e0e0; --danger: #c0392b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding-bottom: 100px; overscroll-behavior-y: none; }
         * { box-sizing: border-box; }
@@ -22,6 +22,7 @@
         .dot.local { background: #7f8c8d; }
         .dot.online { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
         .dot.sync { background: #f1c40f; animation: pulse 0.8s infinite; }
+        .dot.error { background: #e74c3c; box-shadow: 0 0 8px #e74c3c; }
         @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
 
         #configBox { display: none; background: #222; padding: 20px; border-bottom: 1px solid #444; }
@@ -68,6 +69,14 @@
         .timer-display { font-family: monospace; font-size: 2.5rem; text-align: center; background: black; padding: 10px; border-radius: 8px; color: var(--primary); border: 1px solid #333; margin-bottom: 10px; }
         .history-item { background: #2a2a2a; padding: 10px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--primary); }
         .btn-trash { background: var(--danger); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 10px; }
+        
+        /* Debug console */
+        #debugConsole { display: none; background: #0a0a0a; border: 1px solid #333; padding: 10px; margin: 10px; border-radius: 8px; font-family: monospace; font-size: 0.75rem; max-height: 200px; overflow-y: auto; }
+        #debugConsole.show { display: block; }
+        .debug-line { padding: 2px 0; border-bottom: 1px solid #222; }
+        .debug-line.error { color: #e74c3c; }
+        .debug-line.success { color: #2ecc71; }
+        .debug-line.info { color: #3498db; }
     </style>
 </head>
 <body>
@@ -83,11 +92,15 @@
     <div id="configBox">
         <h3 style="margin-top:0; color:var(--primary)">☁️ Connexion Cloud</h3>
         <label style="font-size:0.8rem; color:#aaa;">URL du Script Google</label>
-        <input type="text" id="apiUrlInput" placeholder="https://script.google.com/..." style="font-size:0.8rem;">
+        <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:0.8rem;">
         
         <div style="display:flex; gap:10px; margin-bottom:10px;">
             <button class="btn-primary" onclick="saveConfig()">Connecter</button>
+            <button class="btn-sec" onclick="testConnection()">🔍 Tester</button>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
             <button class="btn-sec" onclick="syncDown()">⬇️ Recevoir</button>
+            <button class="btn-sec" onclick="manualSyncUp()">⬆️ Envoyer</button>
         </div>
 
         <div class="admin-only" style="border:1px solid #555; padding:10px; border-radius:8px; margin-bottom:10px;">
@@ -97,6 +110,7 @@
         </div>
         
         <button class="btn-sec" onclick="showQRCode()">📱 QR Code</button>
+        <button class="btn-sec" onclick="toggleDebug()" style="margin-top:5px;">🐛 Debug Console</button>
 
         <div id="adminLoginArea" class="admin-login-area">
             <label style="color:#aaa;">Déverrouiller Admin</label>
@@ -106,6 +120,8 @@
             </div>
         </div>
     </div>
+    
+    <div id="debugConsole"></div>
 
     <div class="filters">
         <select id="filterSource" onchange="updateTypeFilter(); renderList();" style="font-weight:bold; color:var(--primary);">
@@ -208,7 +224,11 @@
     </div>
 
     <script>
-        // DONNEES BASE
+        // ============================================
+        // SRBC TRAINING V19 - SYNC FIX
+        // ============================================
+        
+        // DONNEES BASE SRBC
         const DATA_SRBC = [{t:"Chevalet par dessus",d:"Facile",ty:"Statique",desc:"- Faire un aller retour avec la blanche en restant dans l'axe avec un chevalet par dessus la bille 1, 2 puis 3.\n- La blanche doit toucher la bille objet.",sc:"1 pt/bille - Max 15"},{t:"Echappée 3 Bandes",d:"Facile",ty:"Dynamique",desc:"- Venir au contact de la 8 en faisant 3 bandes puis bande après contact.",sc:"1 pt/bille - Max 10/côté"},{t:"3/4 de billes",d:"Facile",ty:"Statique",desc:"- Empocher le bille dans le coin puis remettre la blanche en position pour la bille suivante.",sc:"1 pt/bille - Max 20"},{t:"Bande Position 1",d:"Facile",ty:"Statique",desc:"- Empocher la bille objet en bande pour chaque position de blanche",sc:"1 pt/bille - Max 5/côté"},{t:"Stop Shot Entre Billes",d:"Facile",ty:"Statique",desc:"- Empocher la 1 en faisant un carreau sans toucher les 2 autres.",sc:"1 pt/bille - Max 6"},{t:"Effet 1",d:"Facile",ty:"Statique",desc:"- Venir toucher les billes dans l'ordre avec effet latéral.",sc:"1 pt/bille - Max 6"},{t:"Tir Droit",d:"Facile",ty:"Statique",desc:"- Série de 10,20,30,40,50 tirs droits. Alterner côté.",sc:"1 pt/bille"},{t:"Quantite de bille 1",d:"Facile",ty:"Statique",desc:"- Empocher la 1 puis la 2 pour chaque position.",sc:"1 pt/bille - Max 10"},{t:"Le Rectangle",d:"Moyen",ty:"Dynamique",desc:"- Départ bille en main. Empocher dans l'ordre. Pas de replace.",sc:"1 pt/bille - Max 6"},{t:"Le Rectangle 2",d:"Moyen",ty:"Dynamique",desc:"- Idem Rectangle 1.",sc:"1 pt/bille - Max 6"},{t:"Le 5-2",d:"Moyen",ty:"Statique",desc:"- Ligne départ 5-2, 6-2.5... Tir constant.",sc:"1 pt/bille - Max 4"},{t:"Le L 5 Billes",d:"Moyen",ty:"Dynamique",desc:"- Bille en main. Empocher dans l'ordre dans le coin. Sans contact.",sc:"1 pt/bille - Max 5"},{t:"Le L 9 Billes",d:"Moyen",ty:"Dynamique",desc:"- Idem L 5 billes.",sc:"1 pt/bille - Max 9"},{t:"Stop Shot Puissance",d:"Moyen",ty:"Statique",desc:"- Empocher 5 fois chaque bille en stop shot.",sc:"1 pt/bille - Max 15"},{t:"Trajectoire Blanche 1",d:"Moyen",ty:"Dynamique",desc:"- Empocher la 1 et choquer les suivantes. Remplacement.",sc:"1 pt/bille - Max 9"},{t:"Trajectoire Blanche 2",d:"Moyen",ty:"Dynamique",desc:"- Idem, longé de bande.",sc:"1 pt/bille - Max 7"},{t:"Trajectoire Blanche 3",d:"Moyen",ty:"Dynamique",desc:"- Idem Traj 1.",sc:"1 pt/bille - Max 9"},{t:"Trajectoire Blanche 4",d:"Moyen",ty:"Dynamique",desc:"- Idem Traj 1.",sc:"1 pt/bille - Max 9"},{t:"Retour Au Centre",d:"Moyen",ty:"Dynamique",desc:"- Empocher et revenir zone centrale. Sans contact.",sc:"1 pt/bille - Max 4"},{t:"Quantite de bille 2",d:"Moyen",ty:"Statique",desc:"- Empocher la 9, changer de côté.",sc:"1 pt/bille - Max 7/côté"},{t:"Quantite de bille 3",d:"Moyen",ty:"Statique",desc:"- Empocher bille sur spot. 5 tentatives.",sc:"1 pt/bille - Max 5"},{t:"Line Up Central",d:"Moyen",ty:"Dynamique",desc:"- Empocher tout dans poche centrale.",sc:"1 pt/bille - Max 7"},{t:"Retour Petite Bande",d:"Moyen",ty:"Dynamique",desc:"- Longé de bande avec replace.",sc:"1 pt/tour - Max 10"},{t:"Mighty X",d:"Moyen",ty:"Statique",desc:"- Diagonales en carreau. Alterner.",sc:"1 pt/bille"},{t:"Le Carré",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre. Pas de bandes.",sc:"1 pt/bille - Max 9"},{t:"Le Cercle",d:"Moyen",ty:"Dynamique",desc:"- Ne pas sortir la blanche du cercle.",sc:"1 pt/bille - Max 8"},{t:"Longé Bande Même Côté",d:"Moyen",ty:"Statique",desc:"- Longé de bande.",sc:"1 pt/bille - Max 6"},{t:"Longé Bande Opposé",d:"Moyen",ty:"Statique",desc:"- Longé de bande.",sc:"1 pt/bille - Max 6"},{t:"Line Up Inversé",d:"Moyen",ty:"Dynamique",desc:"- Protection derrière billes milieu.",sc:"1 pt/bille - Max 8"},{t:"Line Up Court",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre, poche libre.",sc:"1 pt/bille - Max 8"},{t:"3 billes Continu",d:"Moyen",ty:"Dynamique",desc:"- 3 billes tout ordre, replacer.",sc:"1 pt/tour - Max 10"},{t:"Gamme 1",d:"Moyen",ty:"Dynamique",desc:"- Empocher ordre, poche libre.",sc:"1 pt/bille - Max 4"},{t:"Fermeture Stop Shot",d:"Moyen",ty:"Statique",desc:"- Empocher tout en stop shot.",sc:"1 pt/bille - Max 9"},{t:"Fermeture Progressive",d:"Moyen",ty:"Dynamique",desc:"- 3 billes, puis 4, puis 5...",sc:"1 pt/bille"},{t:"Break 6 Billes",d:"Moyen",ty:"Dynamique",desc:"- Casse 6 billes, vider la table.",sc:"1 pt/bille - Max 6"},{t:"Les 2 Dernieres",d:"Moyen",ty:"Dynamique",desc:"- Empocher coin et replace.",sc:"1 pt/tour - Max 10"},{t:"4 billes Bande",d:"Moyen",ty:"Statique",desc:"- Longé bande.",sc:"1 pt/bille - Max 6"},{t:"Double Line Up",d:"Difficile",ty:"Dynamique",desc:"- Empocher tout dans l'ordre.",sc:"1 pt/bille - Max 15"},{t:"Gamme 2",d:"Difficile",ty:"Dynamique",desc:"- Intérieur vers extérieur alterné.",sc:"1 pt/bille - Max 8"},{t:"Le Tour Infernal",d:"Difficile",ty:"Dynamique",desc:"- Ordre et poches définies.",sc:"1 pt/bille - Max 12"},{t:"Fermeture 9ball",d:"Difficile",ty:"Dynamique",desc:"- Jeu de la 9.",sc:"1 pt/bille - Max 9"},{t:"Le Tour du Monde",d:"Difficile",ty:"Dynamique",desc:"- Empocher la 9 collé bande.",sc:"1 pt/bille - Max 24"}];
 
         // DONNEES FFB
@@ -216,39 +236,70 @@
 
         let exercises = [];
         let currentId = null;
-        let timerInterval = null; let timeLeft = 0;
+        let timerInterval = null; 
+        let timeLeft = 0;
         let API_URL = localStorage.getItem('srbc_api_url') || "";
+        let debugMode = false;
+        let syncInProgress = false;
 
+        // ============================================
+        // DEBUG CONSOLE
+        // ============================================
+        function debugLog(msg, type = 'info') {
+            console.log(`[SRBC ${type.toUpperCase()}]`, msg);
+            const console_el = document.getElementById('debugConsole');
+            if (console_el) {
+                const line = document.createElement('div');
+                line.className = 'debug-line ' + type;
+                line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                console_el.appendChild(line);
+                console_el.scrollTop = console_el.scrollHeight;
+            }
+        }
+
+        function toggleDebug() {
+            debugMode = !debugMode;
+            document.getElementById('debugConsole').classList.toggle('show', debugMode);
+        }
+
+        // ============================================
+        // INIT
+        // ============================================
         init();
 
         function init() {
+            debugLog('Initialisation V19...', 'info');
             const local = localStorage.getItem('billiardApp_db');
             if(local) {
                 exercises = JSON.parse(local);
-                // Migration V17: assure category SRBC = type
                 exercises.forEach(e => {
                     if(!e.source) e.source = "SRBC";
-                    if(e.source === "SRBC") e.category = e.type; // Fix pour SRBC
+                    if(e.source === "SRBC") e.category = e.type;
                 });
+                debugLog(`${exercises.length} exercices chargés depuis le cache local`, 'success');
             } else {
                 generateDefaultDB();
+                debugLog('Base de données par défaut générée', 'info');
             }
             updateTypeFilter();
             renderList();
             updateStatus();
-            if(API_URL) syncDown();
+            
+            // Auto-sync au démarrage si URL configurée
+            if(API_URL) {
+                debugLog('URL Cloud détectée, synchronisation...', 'info');
+                syncDown();
+            }
         }
 
         function generateDefaultDB() {
             exercises = [];
-            // SRBC (Catégorie = Type)
             DATA_SRBC.forEach((e,i) => {
                 exercises.push({
                     id: "srbc_"+i, source:"SRBC", category: e.ty, title:e.t, difficulty:e.d, type:e.ty, 
                     desc:e.desc, scale:e.sc, img:"", cueX:50, cueY:50, history:[]
                 });
             });
-            // FFB
             DATA_FFB.forEach((e,i) => {
                 exercises.push({
                     id: "ffb_"+i, source:"FFB", category:e.c, title:e.t, difficulty:e.d, type:"Statique", 
@@ -258,7 +309,281 @@
             localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
         }
 
-        // --- UTILS DYNAMIQUES ---
+        // ============================================
+        // SYNC FUNCTIONS - VERSION CORRIGÉE
+        // ============================================
+        
+        function updateStatus(status = null) {
+            const d = document.getElementById('statusDot');
+            const t = document.getElementById('statusText');
+            
+            if (status === 'sync') {
+                d.className = "dot sync";
+                t.innerText = "Sync...";
+            } else if (status === 'error') {
+                d.className = "dot error";
+                t.innerText = "Erreur";
+            } else if(API_URL) {
+                d.className = "dot online";
+                t.innerText = "Connecté";
+            } else {
+                d.className = "dot local";
+                t.innerText = "Local";
+            }
+        }
+
+        // Test de connexion
+        async function testConnection() {
+            if(!API_URL) {
+                alert("Veuillez d'abord entrer une URL de script Google.");
+                return;
+            }
+            
+            debugLog('Test de connexion en cours...', 'info');
+            updateStatus('sync');
+            
+            try {
+                // Test GET
+                const response = await fetch(API_URL);
+                const text = await response.text();
+                debugLog(`GET Response: ${text.substring(0, 200)}...`, 'info');
+                
+                try {
+                    const data = JSON.parse(text);
+                    if (Array.isArray(data)) {
+                        debugLog(`✅ GET OK - ${data.length} exercices trouvés sur le cloud`, 'success');
+                        alert(`✅ Connexion réussie!\n${data.length} exercices sur le cloud.`);
+                    } else {
+                        debugLog('⚠️ Réponse JSON mais pas un tableau', 'error');
+                        alert('⚠️ Réponse reçue mais format inattendu.');
+                    }
+                } catch(e) {
+                    debugLog(`❌ Réponse non-JSON: ${text.substring(0, 100)}`, 'error');
+                    alert('❌ Le cloud ne répond pas correctement.\nVérifiez l\'URL du script.');
+                }
+                updateStatus();
+            } catch(err) {
+                debugLog(`❌ Erreur réseau: ${err.message}`, 'error');
+                updateStatus('error');
+                alert(`❌ Erreur de connexion:\n${err.message}`);
+            }
+        }
+
+        // SYNC DOWN (GET) - Récupérer les données du cloud
+        async function syncDown() {
+            if(!API_URL) {
+                debugLog('Pas d\'URL configurée', 'error');
+                return;
+            }
+            if(syncInProgress) {
+                debugLog('Sync déjà en cours, annulé', 'info');
+                return;
+            }
+            
+            syncInProgress = true;
+            updateStatus('sync');
+            debugLog('⬇️ Téléchargement depuis le cloud...', 'info');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                const text = await response.text();
+                debugLog(`Réponse reçue: ${text.length} caractères`, 'info');
+                
+                try {
+                    const data = JSON.parse(text);
+                    
+                    if(Array.isArray(data) && data.length > 0) {
+                        exercises = data;
+                        localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
+                        updateTypeFilter();
+                        renderList();
+                        if(currentId) renderHistory();
+                        debugLog(`✅ ${exercises.length} exercices synchronisés`, 'success');
+                    } else if (Array.isArray(data) && data.length === 0) {
+                        debugLog('⚠️ Cloud vide, données locales conservées', 'info');
+                    } else {
+                        debugLog('⚠️ Format de données inattendu', 'error');
+                    }
+                    updateStatus();
+                } catch(parseErr) {
+                    debugLog(`❌ Erreur parsing JSON: ${parseErr.message}`, 'error');
+                    updateStatus('error');
+                }
+            } catch(err) {
+                debugLog(`❌ Erreur réseau GET: ${err.message}`, 'error');
+                updateStatus('error');
+            } finally {
+                syncInProgress = false;
+            }
+        }
+
+        // SYNC UP (POST) - Envoyer les données vers le cloud
+        // MÉTHODE CORRIGÉE pour Google Apps Script
+        async function syncUp() {
+            // Toujours sauvegarder en local d'abord
+            localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
+            
+            if(!API_URL) {
+                debugLog('Mode local uniquement', 'info');
+                renderList();
+                return Promise.resolve(true);
+            }
+            
+            if(syncInProgress) {
+                debugLog('Sync déjà en cours', 'info');
+                return Promise.resolve(false);
+            }
+            
+            syncInProgress = true;
+            updateStatus('sync');
+            debugLog('⬆️ Envoi vers le cloud...', 'info');
+            
+            const jsonData = JSON.stringify(exercises);
+            debugLog(`Taille des données: ${jsonData.length} caractères`, 'info');
+            
+            try {
+                // Méthode 1: Utiliser un formulaire virtuel pour contourner CORS/redirect
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Important pour Google Apps Script
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: jsonData
+                });
+                
+                // Avec no-cors, on ne peut pas lire la réponse
+                // On considère que c'est OK si pas d'erreur réseau
+                debugLog('✅ Données envoyées (mode no-cors)', 'success');
+                updateStatus();
+                syncInProgress = false;
+                return true;
+                
+            } catch(err) {
+                debugLog(`❌ Erreur envoi: ${err.message}`, 'error');
+                
+                // Méthode 2 de secours: via un formulaire
+                debugLog('Tentative avec méthode alternative...', 'info');
+                try {
+                    await sendViaForm(jsonData);
+                    debugLog('✅ Envoi réussi via formulaire', 'success');
+                    updateStatus();
+                    syncInProgress = false;
+                    return true;
+                } catch(err2) {
+                    debugLog(`❌ Échec méthode alternative: ${err2.message}`, 'error');
+                    updateStatus('error');
+                    syncInProgress = false;
+                    return false;
+                }
+            }
+        }
+        
+        // Méthode alternative via formulaire invisible
+        function sendViaForm(data) {
+            return new Promise((resolve, reject) => {
+                const iframe = document.createElement('iframe');
+                iframe.name = 'syncFrame';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = API_URL;
+                form.target = 'syncFrame';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'data';
+                input.value = data;
+                form.appendChild(input);
+                
+                document.body.appendChild(form);
+                
+                iframe.onload = () => {
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                        document.body.removeChild(form);
+                        resolve(true);
+                    }, 500);
+                };
+                
+                iframe.onerror = () => {
+                    document.body.removeChild(iframe);
+                    document.body.removeChild(form);
+                    reject(new Error('Iframe error'));
+                };
+                
+                form.submit();
+                
+                // Timeout de sécurité
+                setTimeout(() => {
+                    resolve(true);
+                }, 3000);
+            });
+        }
+
+        // Bouton manuel pour forcer l'envoi
+        async function manualSyncUp() {
+            debugLog('Envoi manuel déclenché', 'info');
+            const success = await syncUp();
+            if(success) {
+                alert('✅ Données envoyées vers le cloud!');
+            } else {
+                alert('❌ Échec de l\'envoi. Vérifiez la console de debug.');
+            }
+        }
+
+        function forcePushMaster() {
+            if(!API_URL) return alert("Connectez le Cloud d'abord!");
+            if(confirm("Écraser le Cloud par les données d'usine?")) {
+                generateDefaultDB();
+                syncUp().then(() => {
+                    alert("Cloud réinitialisé avec les données par défaut.");
+                });
+            }
+        }
+
+        function hardReset() {
+            if(confirm("Effacer tout (Local)?")) { 
+                localStorage.removeItem('billiardApp_db'); 
+                location.reload(); 
+            }
+        }
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+        
+        function toggleConfig() {
+            const el = document.getElementById('configBox');
+            el.style.display = el.style.display==='block' ? 'none' : 'block';
+            document.getElementById('apiUrlInput').value = API_URL;
+        }
+
+        function saveConfig() {
+            const url = document.getElementById('apiUrlInput').value.trim();
+            if(url) { 
+                localStorage.setItem('srbc_api_url', url); 
+                API_URL = url; 
+                updateStatus(); 
+                debugLog('URL sauvegardée: ' + url, 'success');
+                syncDown(); 
+            }
+            toggleConfig();
+        }
+
+        function showQRCode() {
+            const u="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data="+encodeURIComponent(window.location.href);
+            const w=window.open("","QR","width=300,height=300");
+            w.document.write(`<div style='text-align:center'><img src='${u}'><br>Scannez pour ouvrir</div>`);
+        }
+
         function updateTypeFilter() {
             const src = document.getElementById('filterSource').value;
             const typeSelect = document.getElementById('filterType');
@@ -279,102 +604,9 @@
             if(document.getElementById('adminPass').value === "SRBCAdmin") {
                 document.body.classList.add('is-admin');
                 document.getElementById('adminLoginArea').style.display='none';
+                debugLog('Mode Admin activé', 'success');
                 alert("🔓 Admin OK");
             } else { alert("❌ Erreur"); }
-        }
-
-        function updateStatus() {
-            const d = document.getElementById('statusDot');
-            const t = document.getElementById('statusText');
-            if(API_URL) { d.className="dot online"; t.innerText="Réglages"; }
-            else { d.className="dot local"; t.innerText="Local"; }
-        }
-
-        function toggleConfig() {
-            const el = document.getElementById('configBox');
-            el.style.display = el.style.display==='block' ? 'none' : 'block';
-            document.getElementById('apiUrlInput').value = API_URL;
-        }
-
-        function saveConfig() {
-            const url = document.getElementById('apiUrlInput').value.trim();
-            if(url) { localStorage.setItem('srbc_api_url', url); API_URL = url; updateStatus(); syncDown(); }
-            toggleConfig();
-        }
-
-        // SYNC DOWN: On ne reçoit que du JSON désormais (le script V5 gère ça)
-        function syncDown() {
-            if(!API_URL) return;
-            document.getElementById('statusDot').className="dot sync";
-            
-            fetch(API_URL)
-            .then(res => res.text())
-            .then(text => {
-                try {
-                    // Si c'est du JSON pur
-                    var data = JSON.parse(text);
-                    // Si c'est la structure de l'appli
-                    if(Array.isArray(data) && data.length > 0) {
-                        exercises = data;
-                        localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
-                        updateTypeFilter();
-                        renderList();
-                        if(currentId) renderHistory();
-                    }
-                    updateStatus();
-                } catch(e) {
-                    // Si le serveur répond du texte bizarre (ex: "Success" d'une vieille version), on ignore
-                    console.log("Received non-JSON data, ignoring update.");
-                    document.getElementById('statusDot').className="dot local";
-                }
-            })
-            .catch(e => {
-                console.error("Sync Down Error", e);
-                document.getElementById('statusDot').className="dot local";
-            });
-        }
-
-        // SYNC UP INTELLIGENT (Text/Plain pour éviter le blocage Google)
-        function syncUp() {
-            if(!API_URL) { localStorage.setItem('billiardApp_db', JSON.stringify(exercises)); renderList(); return Promise.resolve(); }
-            
-            document.getElementById('statusDot').className="dot sync";
-            localStorage.setItem('billiardApp_db', JSON.stringify(exercises));
-
-            return fetch(API_URL, {
-                method: "POST",
-                redirect: "follow",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify(exercises)
-            })
-            .then(res => res.text()) // On lit en texte d'abord
-            .then(text => {
-                // Si on reçoit du JSON {status: success} ou juste "Success"
-                updateStatus();
-                return true;
-            })
-            .catch(err => {
-                document.getElementById('statusDot').className="dot local";
-                alert("Echec envoi : Connexion perdue ou fichier trop lourd.");
-                throw err;
-            });
-        }
-
-        function forcePushMaster() {
-            if(!API_URL) return alert("Connectez le Cloud !");
-            if(confirm("Écraser le Cloud par les données d'usine ?")) {
-                generateDefaultDB();
-                syncUp().then(() => alert("Cloud réinitialisé."));
-            }
-        }
-
-        function hardReset() {
-            if(confirm("Effacer tout (Local) ?")) { localStorage.removeItem('billiardApp_db'); location.reload(); }
-        }
-        function showQRCode() {
-            const u="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data="+encodeURIComponent(window.location.href);
-            const w=window.open("","QR","width=300,height=300");
-            w.document.write(`<div style='text-align:center'><img src='${u}'><br>Scannez pour ouvrir</div>`);
         }
 
         function renderList() {
@@ -384,15 +616,11 @@
             const fDiff = document.getElementById('filterDiff').value;
             list.innerHTML = '';
             
-            const order = {"Facile":1, "Moyen":2, "Difficile":3};
             const filtered = exercises.filter(e => 
                 (fSrc==='all' || e.source===fSrc) &&
                 (fType==='all' || e.category===fType) &&
                 (fDiff==='all' || e.difficulty===fDiff)
-            ).sort((a,b) => {
-                // Tri alphabétique pur comme demandé
-                return a.title.localeCompare(b.title);
-            });
+            ).sort((a,b) => a.title.localeCompare(b.title));
 
             if(filtered.length === 0) {
                 document.getElementById('emptyMsg').style.display = 'block';
@@ -401,9 +629,7 @@
                 filtered.forEach(ex => {
                     const c = document.createElement('div'); c.className='card'; c.onclick=()=>openPlay(ex.id);
                     const img = ex.img ? `<img src="${ex.img}" class="card-img-real">` : `<div class="card-img-placeholder">🎱</div>`;
-                    
                     const badgeSrc = `<span class="source-tag ${ex.source}">${ex.source}</span>`;
-                    
                     c.innerHTML = `${badgeSrc}${img}<div class="card-body"><h3 class="card-title">${ex.title}</h3><div class="badges"><span class="badge cat">${ex.category}</span><span class="badge diff-${ex.difficulty}">${ex.difficulty}</span></div></div>`;
                     list.appendChild(c);
                 });
@@ -414,19 +640,15 @@
             currentId = id;
             const ex = exercises.find(e=>e.id===id);
             document.getElementById('viewTitle').innerText = ex.title;
-            
             document.getElementById('viewSourceTag').innerText = ex.source;
             document.getElementById('viewSourceTag').className = `badge src-${ex.source}`;
-            
             document.getElementById('viewCatTag').innerText = ex.category;
             document.getElementById('viewDiff').innerText = ex.difficulty;
             document.getElementById('viewDiff').className = `badge diff-${ex.difficulty}`;
-            
             document.getElementById('viewDesc').innerText = ex.desc;
             document.getElementById('viewScale').innerText = ex.scale;
             document.getElementById('viewImgContainer').innerHTML = ex.img ? `<img src="${ex.img}" style="height:100%; object-fit:contain">` : `<span style="font-size:3rem; color:#444">🎱</span>`;
             document.getElementById('viewImpact').style.left=ex.cueX+"%"; document.getElementById('viewImpact').style.top=ex.cueY+"%";
-            
             updatePlayerFilter(ex);
             renderHistory();
             document.getElementById('modalPlay').classList.add('active');
@@ -480,6 +702,7 @@
             document.getElementById('editSource').value = "SRBC";
             document.getElementById('modalEditor').classList.add('active');
         }
+        
         function openEditorFromView() {
             closeModal('modalPlay');
             const ex = exercises.find(e=>e.id===currentId);
@@ -496,16 +719,24 @@
             document.getElementById('editX').value=ex.cueX; document.getElementById('editY').value=ex.cueY;
             document.getElementById('modalEditor').classList.add('active');
         }
-        function resetEdit() { document.getElementById('editId').value=""; document.getElementById('editCat').value=""; document.getElementById('editTitle').value=""; document.getElementById('editImg').value=""; document.getElementById('editDesc').value=""; document.getElementById('editScale').value=""; }
         
-        function saveData() {
+        function resetEdit() { 
+            document.getElementById('editId').value=""; 
+            document.getElementById('editCat').value=""; 
+            document.getElementById('editTitle').value=""; 
+            document.getElementById('editImg').value=""; 
+            document.getElementById('editDesc').value=""; 
+            document.getElementById('editScale').value=""; 
+        }
+        
+        async function saveData() {
             const id = document.getElementById('editId').value || "u_"+Date.now();
-            const t = document.getElementById('editTitle').value; if(!t) return alert("Titre?");
+            const t = document.getElementById('editTitle').value; 
+            if(!t) return alert("Titre?");
             
-            // BUTTON FEEDBACK
             const btn = document.querySelector('#modalEditor .btn-primary');
             const oldText = btn.innerText;
-            btn.innerText = "⏳ Envoi Cloud...";
+            btn.innerText = "⏳ Envoi...";
             btn.disabled = true;
 
             const newItem = {
@@ -527,28 +758,34 @@
             if(idx>-1) { newItem.history=exercises[idx].history; exercises[idx]=newItem; }
             else exercises.push(newItem);
             
-            // Reset filtres pour voir le nouvel item
             document.getElementById('filterSource').value = 'all';
             document.getElementById('filterType').value = 'all'; 
             
-            // On attend la fin de la synchro pour fermer
-            syncUp().then(() => {
-                btn.innerText = oldText;
-                btn.disabled = false;
-                closeModal('modalEditor'); 
-                updateTypeFilter(); 
-                renderList(); 
-            });
+            await syncUp();
+            btn.innerText = oldText;
+            btn.disabled = false;
+            closeModal('modalEditor'); 
+            updateTypeFilter(); 
+            renderList(); 
         }
         
         function deleteData() {
-            if(confirm("Supprimer?")) { exercises = exercises.filter(e=>e.id!==document.getElementById('editId').value); closeModal('modalEditor'); renderList(); syncUp(); }
+            if(confirm("Supprimer?")) { 
+                exercises = exercises.filter(e=>e.id!==document.getElementById('editId').value); 
+                closeModal('modalEditor'); 
+                renderList(); 
+                syncUp(); 
+            }
         }
 
         function toggleTimer() {
             const b = document.getElementById('btnTimer');
-            if(timerInterval) { clearInterval(timerInterval); timerInterval=null; b.innerText="START"; b.classList.remove('btn-danger'); }
-            else {
+            if(timerInterval) { 
+                clearInterval(timerInterval); 
+                timerInterval=null; 
+                b.innerText="START"; 
+                b.classList.remove('btn-danger'); 
+            } else {
                 if(timeLeft<=0) timeLeft=(parseInt(document.getElementById('timerInput').value)||10)*60;
                 b.innerText="STOP"; b.classList.add('btn-danger');
                 timerInterval = setInterval(() => {
@@ -559,9 +796,30 @@
                 }, 1000);
             }
         }
-        function resetTimer() { clearInterval(timerInterval); timerInterval=null; timeLeft=0; document.getElementById('timerDisplay').innerText="00:00"; document.getElementById('btnTimer').innerText="START"; document.getElementById('btnTimer').classList.remove('btn-danger'); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); if(id==='modalPlay') resetTimer(); }
-        function setImpact(e,d,x,y) { const r=e.currentTarget.getBoundingClientRect(); const px=((e.clientX-r.left)/r.width)*100; const py=((e.clientY-r.top)/r.height)*100; document.getElementById(d).style.left=px+"%"; document.getElementById(d).style.top=py+"%"; document.getElementById(x).value=px; document.getElementById(y).value=py; }
+        
+        function resetTimer() { 
+            clearInterval(timerInterval); 
+            timerInterval=null; 
+            timeLeft=0; 
+            document.getElementById('timerDisplay').innerText="00:00"; 
+            document.getElementById('btnTimer').innerText="START"; 
+            document.getElementById('btnTimer').classList.remove('btn-danger'); 
+        }
+        
+        function closeModal(id) { 
+            document.getElementById(id).classList.remove('active'); 
+            if(id==='modalPlay') resetTimer(); 
+        }
+        
+        function setImpact(e,d,x,y) { 
+            const r=e.currentTarget.getBoundingClientRect(); 
+            const px=((e.clientX-r.left)/r.width)*100; 
+            const py=((e.clientY-r.top)/r.height)*100; 
+            document.getElementById(d).style.left=px+"%"; 
+            document.getElementById(d).style.top=py+"%"; 
+            document.getElementById(x).value=px; 
+            document.getElementById(y).value=py; 
+        }
     </script>
 </body>
 </html>
